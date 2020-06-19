@@ -61,7 +61,7 @@ docker volume create verdaccio_data
 docker volume create verdaccio_plugins
 docker run \
   -p 4873:4873 \
-  -v verdaccio_conf/verdaccio/conf \
+  -v verdaccio_conf:/verdaccio/conf \
   -v verdaccio_data:/verdaccio/storage \
   -v verdaccio_plugins:/verdaccio/plugins \
   hertzg/verdaccio
