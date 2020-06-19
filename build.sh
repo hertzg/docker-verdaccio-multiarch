@@ -4,7 +4,7 @@ set -xe
 
 ORIGIN="verdaccio/verdaccio"
 MIRROR="hertzg/verdaccio"
-PLATFORMS="linux/amd64,linux/386,linux/arm64,linux/ppc64le,linux/arm/v7,linux/arm/v6"
+PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
 
 BUILDMAP=$(node ./buildMap.js "$ORIGIN" "$MIRROR")
 
