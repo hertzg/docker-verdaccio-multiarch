@@ -39,10 +39,7 @@ jobs:
 
       - name: Build & Push
         run: |
-          npm ci
-          node ./build.js \
-            --cache-from "type=local,src=/tmp/.buildx-cache" \
-            --cache-to "type=local,dest=/tmp/.buildx-cache"
+          ./build.sh
 
       - name: Docker Check Manifest
         run: |
