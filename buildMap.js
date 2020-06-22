@@ -5,7 +5,7 @@ const getJSON = (...args) =>
       : require("http");
 
     transport
-      .get(...args, (res) => {
+      .get(...args, res => {
         const { statusCode } = res;
         const contentType = res.headers["content-type"];
 
@@ -28,7 +28,7 @@ const getJSON = (...args) =>
 
         res.setEncoding("utf8");
         let rawData = "";
-        res.on("data", (chunk) => {
+        res.on("data", chunk => {
           rawData += chunk;
         });
         res.on("end", () => {
@@ -43,36 +43,49 @@ const getJSON = (...args) =>
       .on("error", reject);
   });
 
-const loadGitHubReleases = (repo) =>
-  getJSON(`https://api.github.com/repos/verdaccio/verdaccio/releases`, {
+const loadGitHubReleases = repo =>
+  getJSON(`https://api.github.com/repos/${repo}/releases`, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "hertzg/docker-verdaccio-multiarch",
-    },
+      "User-Agent": "hertzg/docker-verdaccio-multiarch"
+    }
   });
 
-const isLatestRelease = (release) => !release.prerelease && !release.draft;
+const isLatestRelease = release => !release.prerelease && !release.draft;
 
-const convertReleasesToImageTags = (repo) =>
-  loadGitHubReleases(repo).then((releases) =>
-    releases.reduce(
-      (acc, release) => {
-        if (!acc.latest && isLatestRelease(release)) {
-          acc.latest = release;
-        } else {
-          acc.other.push(release);
-        }
-        return acc;
-      },
-      { latest: null, other: [] }
-    )
-  );
+const { EXCLUDE_TAGS = "" } = process.env;
+const blacklist = EXCLUDE_TAGS.split(",");
 
-const releaseToTagFlag = (release) => `--tag ${mirror}:${release.tag_name}`;
+const filterReleases = releases =>
+  releases
+    .filter(release => release.tag_name.startsWith("v"))
+    .filter(release => !blacklist.includes(release.tag_name));
+
+const convertReleasesToImageTags = repo =>
+  loadGitHubReleases(repo)
+    .then(filterReleases)
+    .then(releases =>
+      releases.reduce(
+        (acc, release) => {
+          if (!acc.latest && isLatestRelease(release)) {
+            acc.latest = release;
+          } else {
+            acc.other.push(release);
+          }
+          return acc;
+        },
+        { latest: null, other: [] }
+      )
+    );
+
+const releaseToTagFlag = release =>
+  `--tag ${mirror}:${
+    release.tag_name
+  } --tag ${mirror}:${release.tag_name.replace(/^v/, "")}`;
 
 const convertToBuildMap = ({ latest, other }) => [
   [latest.tag_name, `--tag ${mirror}:latest ${releaseToTagFlag(latest)}`],
-  ...other.map((release) => [release.tag_name, releaseToTagFlag(release)]),
+  ...other.map(release => [release.tag_name, releaseToTagFlag(release)])
 ];
 
 if (process.argv.length < 4) {
@@ -84,5 +97,5 @@ const [origin, mirror] = process.argv.slice(2);
 
 convertReleasesToImageTags(origin)
   .then(convertToBuildMap)
-  .then((entries) => entries.map((entry) => JSON.stringify(entry)).join("\n"))
+  .then(entries => entries.map(entry => JSON.stringify(entry)).join("\n"))
   .then(console.log);
