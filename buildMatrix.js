@@ -5,7 +5,7 @@ const getJSON = (...args) =>
       : require("http");
 
     transport
-      .get(...args, res => {
+      .get(...args, (res) => {
         const { statusCode } = res;
         const contentType = res.headers["content-type"];
 
@@ -28,7 +28,7 @@ const getJSON = (...args) =>
 
         res.setEncoding("utf8");
         let rawData = "";
-        res.on("data", chunk => {
+        res.on("data", (chunk) => {
           rawData += chunk;
         });
         res.on("end", () => {
@@ -43,31 +43,32 @@ const getJSON = (...args) =>
       .on("error", reject);
   });
 
-const loadGitHubReleases = repo =>
+const loadGitHubReleases = (repo) =>
   getJSON(`https://api.github.com/repos/${repo}/releases`, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "hertzg/docker-verdaccio-multiarch"
-    }
+      "User-Agent": "hertzg/docker-verdaccio-multiarch",
+    },
   });
 
-const isLatestRelease = release => !release.prerelease && !release.draft;
+const isLatestRelease = (release) => !release.prerelease && !release.draft;
 
 const { EXCLUDE_TAGS = "" } = process.env;
-const blacklist = EXCLUDE_TAGS.split(",").filter(s => s && s.length);
+const blacklist = EXCLUDE_TAGS.split(",").filter((s) => s && s.length);
 
 // TODO(@hertzg): Use semver for range blocks instead of starts with
-const isBlacklisted = tag => blacklist.some(exclude => tag.startsWith(exclude));
+const isBlacklisted = (tag) =>
+  blacklist.some((exclude) => tag.startsWith(exclude));
 
-const filterReleases = releases =>
+const filterReleases = (releases) =>
   releases
-    .filter(release => release.tag_name.startsWith("v"))
-    .filter(release => !isBlacklisted(release.tag_name));
+    .filter((release) => release.tag_name.startsWith("v"))
+    .filter((release) => !isBlacklisted(release.tag_name));
 
-const convertReleasesToImageTags = repo =>
+const convertReleasesToImageTags = (repo) =>
   loadGitHubReleases(repo)
     .then(filterReleases)
-    .then(releases =>
+    .then((releases) =>
       releases.reduce(
         (acc, release) => {
           if (!acc.latest && isLatestRelease(release)) {
@@ -81,7 +82,7 @@ const convertReleasesToImageTags = repo =>
       )
     );
 
-const releaseToTagFlag = release =>
+const releaseToTagFlag = (release) =>
   `--tag ${mirror}:${
     release.tag_name
   } --tag ${mirror}:${release.tag_name.replace(/^v/, "")}`;
@@ -91,7 +92,7 @@ const releaseToTagFlag = release =>
 //                Example: if there is only one v8.3.1 the built image should be tagged as: v8.3.1, 8.3.1, 8.3, 8
 const convertToBuildMap = ({ latest, other }) => [
   [latest.tag_name, `--tag ${mirror}:latest ${releaseToTagFlag(latest)}`],
-  ...other.map(release => [release.tag_name, releaseToTagFlag(release)])
+  ...other.map((release) => [release.tag_name, releaseToTagFlag(release)]),
 ];
 
 if (process.argv.length < 4) {
@@ -103,5 +104,8 @@ const [origin, mirror] = process.argv.slice(2);
 
 convertReleasesToImageTags(origin)
   .then(convertToBuildMap)
-  .then(entries => entries.map(entry => JSON.stringify(entry)).join("\n"))
+  .then((entries) => ({
+    include: entries.map((entry) => ({ revision: entry[0], args: entry[1] })),
+  }))
+  .then(JSON.stringify)
   .then(console.log);
