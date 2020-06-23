@@ -37,7 +37,7 @@ jobs:
 
       - name: Build & Push
         env:
-          EXCLUDE_TAGS: "v4.3.5"
+          EXCLUDE_TAGS: "v4.3."
         run: |
           ./build.sh \
              --cache-from "type=local,src=/tmp/.buildx-cache" \

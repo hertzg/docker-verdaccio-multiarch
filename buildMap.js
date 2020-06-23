@@ -54,12 +54,15 @@ const loadGitHubReleases = repo =>
 const isLatestRelease = release => !release.prerelease && !release.draft;
 
 const { EXCLUDE_TAGS = "" } = process.env;
-const blacklist = EXCLUDE_TAGS.split(",");
+const blacklist = EXCLUDE_TAGS.split(",").filter(s => s && s.length);
+
+// TODO(@hertzg): Use semver for range blocks instead of starts with
+const isBlacklisted = tag => blacklist.some(exclude => tag.startsWith(exclude));
 
 const filterReleases = releases =>
   releases
     .filter(release => release.tag_name.startsWith("v"))
-    .filter(release => !blacklist.includes(release.tag_name));
+    .filter(release => !isBlacklisted(release.tag_name));
 
 const convertReleasesToImageTags = repo =>
   loadGitHubReleases(repo)
@@ -83,6 +86,9 @@ const releaseToTagFlag = release =>
     release.tag_name
   } --tag ${mirror}:${release.tag_name.replace(/^v/, "")}`;
 
+// TODO(@hertzg): Use semver to find and tag latest version in specific minor and major versions an tag them with the
+//                respective numbers.
+//                Example: if there is only one v8.3.1 the built image should be tagged as: v8.3.1, 8.3.1, 8.3, 8
 const convertToBuildMap = ({ latest, other }) => [
   [latest.tag_name, `--tag ${mirror}:latest ${releaseToTagFlag(latest)}`],
   ...other.map(release => [release.tag_name, releaseToTagFlag(release)])
