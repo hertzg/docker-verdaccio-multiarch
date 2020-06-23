@@ -25,7 +25,7 @@ jobs:
           MIRROR: "hertzg/verdaccio"
           EXCLUDE_TAGS: "v4.3.,v3.13."
         run: |
-          BUILDMAP=$(node ./buildMap.js "$ORIGIN" "$MIRROR")
+          BUILDMAP=$(node ./buildMatrix.js "$ORIGIN" "$MIRROR")
           echo "::set-output name=matrix::${BUILDMAP}"
   builds:
     name: hertz/verdaccio:${{ matrix.revision }}
