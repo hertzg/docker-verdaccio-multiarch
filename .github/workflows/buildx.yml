@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 14
 
+      - name: Checkout
+        uses: actions/checkout@v2
+
       - name: Set Matrix
         id: set-matrix
         env:
