@@ -26,7 +26,7 @@ jobs:
         env:
           ORIGIN: "verdaccio/verdaccio"
           MIRROR: "hertzg/verdaccio"
-          EXCLUDE_TAGS: "v4.3.,v4.2.,v3.13."
+          EXCLUDE_TAGS: "v4.3.,v4.2.,v4.1.,v4.0.,v3.13."
         run: |
           BUILDMAP=$(node ./buildMatrix.js "$ORIGIN" "$MIRROR")
           echo "::set-output name=matrix::${BUILDMAP}"
