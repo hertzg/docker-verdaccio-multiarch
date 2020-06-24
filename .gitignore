@@ -1,2 +1,4 @@
 .idea/
 verdaccio/repo
+node_modules/
+releases.json

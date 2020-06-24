@@ -1,3 +1,4 @@
+const Semver = require("semver");
 const getJSON = (...args) =>
   new Promise((resolve, reject) => {
     const transport = args[0].startsWith("https")
@@ -51,49 +52,61 @@ const loadGitHubReleases = (repo) =>
     },
   });
 
-const isLatestRelease = (release) => !release.prerelease && !release.draft;
-
 const { EXCLUDE_TAGS = "" } = process.env;
 const blacklist = EXCLUDE_TAGS.split(",").filter((s) => s && s.length);
 
 // TODO(@hertzg): Use semver for range blocks instead of starts with
+//                See also: https://regex101.com/r/vkijKf/1/
 const isBlacklisted = (tag) =>
   blacklist.some((exclude) => tag.startsWith(exclude));
 
 const filterReleases = (releases) =>
   releases
     .filter((release) => release.tag_name.startsWith("v"))
-    .filter((release) => !isBlacklisted(release.tag_name));
+    .filter((release) => !isBlacklisted(release.tag_name))
+    // Only leave semver parsable (loosely)
+    .filter((release) => Semver.clean(release.tag_name, { loose: true }));
 
-const convertReleasesToImageTags = (repo) =>
+const groupReleases = (repo) =>
   loadGitHubReleases(repo)
     .then(filterReleases)
     .then((releases) =>
-      releases.reduce(
-        (acc, release) => {
-          if (!acc.latest && isLatestRelease(release)) {
-            acc.latest = release;
-          } else {
-            acc.other.push(release);
-          }
-          return acc;
-        },
-        { latest: null, other: [] }
-      )
+      releases
+        .map((release) => ({
+          revision: release.tag_name,
+          version: Semver.clean(release.tag_name),
+          semver: Semver.parse(Semver.clean(release.tag_name)),
+        }))
+        .sort(({ version: a }, { version: b }) => Semver.rcompare(a, b))
+        .reduceRight(
+          (acc, { semver, revision }) => ({
+            ...acc,
+            latest: revision,
+            [`${semver.major}`]: revision,
+            [`${semver.major}.${semver.minor}`]: revision,
+            [semver.format()]: revision,
+            [revision]: revision,
+          }),
+          {}
+        )
+    )
+    .then((revisionsByVersionGroup) =>
+      Object.entries(revisionsByVersionGroup).reduce((acc, [tag, revision]) => {
+        if (acc[revision]) {
+          acc[revision].push(tag);
+        } else {
+          acc[revision] = [tag];
+        }
+        return acc;
+      }, {})
     );
 
-const releaseToTagFlag = (release) =>
-  `--tag ${mirror}:${
-    release.tag_name
-  } --tag ${mirror}:${release.tag_name.replace(/^v/, "")}`;
+const tagToFlag = (tag) => `--tag ${mirror}:${tag}`;
 
-// TODO(@hertzg): Use semver to find and tag latest version in specific minor and major versions an tag them with the
-//                respective numbers.
-//                Example: if there is only one v8.3.1 the built image should be tagged as: v8.3.1, 8.3.1, 8.3, 8
-const convertToBuildMap = ({ latest, other }) => [
-  [latest.tag_name, `--tag ${mirror}:latest ${releaseToTagFlag(latest)}`],
-  ...other.map((release) => [release.tag_name, releaseToTagFlag(release)]),
-];
+const convertGroupsToBuildArgs = (builds) =>
+  Object.entries(builds)
+    .sort(([a], [b]) => Semver.rcompare(a, b))
+    .map(([revision, tags]) => [revision, tags.map(tagToFlag).join(" ")]);
 
 if (process.argv.length < 4) {
   console.error(`usage: ${__filename} <origin> <mirror>`);
@@ -102,8 +115,8 @@ if (process.argv.length < 4) {
 
 const [origin, mirror] = process.argv.slice(2);
 
-convertReleasesToImageTags(origin)
-  .then(convertToBuildMap)
+groupReleases(origin)
+  .then(convertGroupsToBuildArgs)
   .then((entries) => ({
     include: entries.map((entry) => ({ revision: entry[0], args: entry[1] })),
   }))
