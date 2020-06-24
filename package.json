@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "author": {
+    "name": "George Kotchlamazashvili",
+    "email": "georgedot@gmail.com"
+  },
+  "dependencies": {
+    "semver": "^7.3.2"
+  }
+}
